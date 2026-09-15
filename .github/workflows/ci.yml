@@ -1,0 +1,105 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+  TF_ROLE: arn:aws:iam::814623398856:role/auto-repair-github-actions
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  terraform:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform -chdir=infra fmt -check
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.TF_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init
+        run: terraform -chdir=infra init -input=false
+
+      - name: Validate
+        run: terraform -chdir=infra validate
+
+      - name: Plan
+        run: terraform -chdir=infra plan -input=false -no-color
+
+  deploy:
+    needs: terraform
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.TF_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Init
+        run: terraform -chdir=infra init -input=false
+
+      - name: Apply
+        run: terraform -chdir=infra apply -input=false -auto-approve
+
+      - name: Smoke test the endpoint
+        run: |
+          ENDPOINT=$(terraform -chdir=infra output -raw auth_endpoint)
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$ENDPOINT" \
+            -H 'content-type: application/json' \
+            -d '{"cpf":"00000000000"}')
+          echo "Invalid CPF returned HTTP $STATUS"
+          test "$STATUS" = "400"

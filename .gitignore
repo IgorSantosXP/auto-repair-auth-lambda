@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.terraform/
+.build/
+*.tfplan
+*.tfstate
+*.tfstate.*
+*.auto.tfvars
+terraform.tfvars
+crash.log
