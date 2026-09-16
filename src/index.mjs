@@ -3,6 +3,16 @@ import jwt from "jsonwebtoken";
 import { normalizeCpf, isValidCpf } from "./cpf.mjs";
 import { log } from "./logger.mjs";
 
+const CONNECTION_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ETIMEDOUT",
+  "ENOTFOUND",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ECONNRESET",
+  "EPIPE"
+]);
+
 const TOKEN_TTL_SECONDS = Number(process.env.TOKEN_TTL_SECONDS ?? 3600);
 const ISSUER = "auto-repair-auth";
 const AUDIENCE = "customer";
@@ -72,8 +82,18 @@ export async function handler(event) {
     );
     customer = rows[0];
   } catch (error) {
-    log("error", "Database lookup failed", { requestId, error: error.message });
-    return failure(503, "database_unavailable", "Could not reach the customer database", requestId);
+    const unreachable = CONNECTION_ERROR_CODES.has(error.code);
+
+    log("error", "Database lookup failed", {
+      requestId,
+      error: error.message,
+      code: error.code,
+      unreachable
+    });
+
+    return unreachable
+      ? failure(503, "database_unavailable", "Could not reach the customer database", requestId)
+      : failure(500, "database_error", "The customer database rejected the query", requestId);
   }
 
   if (!customer) {

@@ -73,7 +73,8 @@ que é o formato em que a aplicação persiste o campo `document`.
 | 400 | `invalid_cpf` | CPF ausente, com tamanho errado ou dígitos verificadores inválidos |
 | 404 | `customer_not_found` | Nenhum cliente com aquele documento |
 | 403 | `customer_inactive` | Cliente removido logicamente (`deleted_at`) |
-| 503 | `database_unavailable` | Falha ao alcançar o RDS |
+| 500 | `database_error` | O banco respondeu, mas rejeitou a consulta (schema ausente, por exemplo) |
+| 503 | `database_unavailable` | Falha de rede ao alcançar o RDS |
 
 O formato de erro é o mesmo da API Rails (`{ "error": { "code", "message" } }`),
 para que o consumidor não precise tratar dois contratos.
