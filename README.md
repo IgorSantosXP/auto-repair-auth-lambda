@@ -182,6 +182,11 @@ uma requisição do gateway até o banco. O Datadog coleta o grupo de logs
 
 Autenticação na AWS por **OIDC**, sem access key nos Secrets do GitHub.
 
+## Documentação arquitetural
+
+Diagramas, ADRs, RFCs e modelo de dados do sistema completo:
+**[índice da documentação](https://github.com/IgorSantosXP/auto-repair-api/tree/main/docs)**.
+
 ## API
 
 Collection completa da aplicação:
